@@ -1,7 +1,4 @@
-package br.com.actionsys.entity.ocoren;
-
-import jakarta.xml.bind.annotation.XmlElement;
-import jakarta.xml.bind.annotation.XmlElementWrapper;
+package br.com.actionsys.entity.ocorren;
 
 import java.util.List;
 

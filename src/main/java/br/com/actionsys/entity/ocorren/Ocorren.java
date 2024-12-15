@@ -1,4 +1,4 @@
-package br.com.actionsys.entity.ocoren;
+package br.com.actionsys.entity.ocorren;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -1,24 +1,23 @@
 package br.com.actionsys.sftp;
 
-import lombok.Getter;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Configuration;
+import lombok.Data;
 
-@Getter
-@Configuration
+@Data
 public class SftpConfig {
-    @Value("${sftp.host}")
+
+    private String inputFolder;
     private String host;
-
-    @Value("${sftp.port:0}")
     private int port;
-
-    @Value("${sftp.username}")
     private String username;
-
-    @Value("${sftp.password}")
     private String password;
-
-    @Value("${sftp.arquivoChave:}")
     private String ftpArquivoChave;
+
+    public SftpConfig(String inputFolder, String host, int port, String username, String password, String ftpArquivoChave) {
+        this.inputFolder = inputFolder;
+        this.host = host;
+        this.port = port;
+        this.username = username;
+        this.password = password;
+        this.ftpArquivoChave = ftpArquivoChave;
+    }
 }

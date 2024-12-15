@@ -1,4 +1,4 @@
-package br.com.actionsys.entity.ocoren;
+package br.com.actionsys.entity.ocorren;
 
 import jakarta.xml.bind.annotation.XmlElement;
 

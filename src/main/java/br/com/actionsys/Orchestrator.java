@@ -1,13 +1,14 @@
 package br.com.actionsys;
 
-import br.com.actionsys.entity.ocoren.Ocorren;
-import br.com.actionsys.entity.ocoren.OcorrenciaEntrega;
-import br.com.actionsys.entity.ocoren.TxtOcoren;
+import br.com.actionsys.entity.ocorren.Ocorren;
+import br.com.actionsys.entity.ocorren.OcorrenciaEntrega;
+import br.com.actionsys.entity.ocorren.TxtOcoren;
 import br.com.actionsys.sendXml.SendXmlService;
+import br.com.actionsys.sftp.SftpConfig;
+import br.com.actionsys.sftp.SftpConfigFactory;
 import br.com.actionsys.sftp.SftpService;
 import br.com.actionsys.util.CodeUtil;
 import br.com.actionsys.util.FilesUtil;
-import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,12 +36,8 @@ public class Orchestrator {
     private SendXmlService sendXmlService;
     @Autowired
     private SftpService sftpService;
-
-    // Sftp Folders
-    @Value("${sftp.input.solistica}")
-    private String dirInputSolistica;
-    @Value("${sftp.input.luft}")
-    private String dirInputLuft;
+    @Autowired
+    private SftpConfigFactory sftpConfigFactory;
 
     // txt folders
     @Value("${dir.txt.input}")
@@ -62,67 +59,44 @@ public class Orchestrator {
     private static final String TRANSPORTADORA_LUFT = "luft";
     private static final String TRANSPORTADORA_SOLISTICA = "solistica";
 
-    // Cria os diretorios caso não haja
-    @PostConstruct
-    public void initializeDirectories() {
-        createDirectoryIfNotExists(dirTxtInput + TRANSPORTADORA_LUFT);
-        createDirectoryIfNotExists(dirTxtInput + TRANSPORTADORA_SOLISTICA);
-        createDirectoryIfNotExists(dirTxtError);
-        createDirectoryIfNotExists(dirTxtOthers);
-        createDirectoryIfNotExists(dirXmlError);
-        createDirectoryIfNotExists(dirXmlOutput + TRANSPORTADORA_LUFT);
-        createDirectoryIfNotExists(dirXmlOutput + TRANSPORTADORA_SOLISTICA);
-    }
-
-    private void createDirectoryIfNotExists(String dirPath) {
-        try {
-            Path path = Paths.get(dirPath).toAbsolutePath();
-            if (!Files.exists(path)) {
-                Files.createDirectories(path);
-                log.info("Diretório criado: {}", path);
-            }
-        } catch (IOException e) {
-            log.error("Erro ao criar o diretório: {}", dirPath, e);
-        }
-    }
-
     public void process() {
+
+        // Faz uma lista de SFTP
         try {
-            log.info("Iniciando processamento de arquivos");
+            List<SftpConfig> configs = List.of(
+                    sftpConfigFactory.getSolisticaConfig(),
+                    sftpConfigFactory.getLuftConfig()
+            );
 
-            // Lê o diretório das duas transportadoras
-            List<String> directoryList = List.of(dirInputSolistica, dirInputLuft);
-
-            for (String directory : directoryList) {
-
+            for (SftpConfig config : configs) {
                 // Baixa o Arquivo (Assim que ele baixa com sucesso, é excluído do SFTP)
-                List<String> downloadedFiles = sftpService.downloadFiles(directory, dirTxtInput);
+                List<String> downloadedFiles = sftpService.downloadFiles(config.getInputFolder(), dirTxtInput, config);
 
                 for (String file : downloadedFiles) {
                     Path filePath = Paths.get(dirTxtInput, file);
                     if (filePath.toString().endsWith(".txt")) {
                         try {
                             // Identifica qual transportadora estamos a processar
-                            String carrier = identifyCarrier(directory);
+                            String carrier = identifyCarrier(config.getUsername());
 
                             // Transforma txt para objeto Ocorren
                             Ocorren ocorren = readOcorenFile(filePath.toString());
                             // Gera xml OTM e envia para OTM.
-                            generateSendXml(ocorren, file, carrier);
+                            generateSendXml(ocorren, file);
 
                             // Move para pasta de saída correspondente a transportadora
                             Path outputPath = Paths.get(dirTxtOutput, carrier, file);
-                            FilesUtil.move(filePath, outputPath.toString());
+                            FilesUtil.move(filePath.toFile(), outputPath.toString());
                             log.info("Arquivo processado e movido para saída: {}", file);
                         } catch (Exception e) {
                             Path errorPath = Paths.get(dirTxtError, file);
-                            FilesUtil.move(filePath, errorPath.toString());
+                            FilesUtil.move(filePath.toFile(), errorPath.toString());
                             log.error("Erro ao processar arquivo: {}, movido para pasta de erro.", file, e);
                         }
                     } else {
                         // Caso não seja txt
                         Path othersPath = Paths.get(dirTxtOthers, file);
-                        FilesUtil.move(filePath, othersPath.toString());
+                        FilesUtil.move(filePath.toFile(), othersPath.toString());
                         log.info("Arquivo não suportado movido para 'outros': {}", file);
                     }
                 }
@@ -146,6 +120,10 @@ public class Orchestrator {
             String line;
             while ((line = br.readLine()) != null) {
                 String idRegistry = line.substring(0, 3).trim();
+                if (idRegistry.equals("541")) {
+                    txtOcoren.setCnpjTransportadora(line.substring(8, 18));
+                    ocorren.getOcorrencias().add(txtOcoren);
+                }
                 if (idRegistry.equals("542")) {
                     OcorrenciaEntrega ocorrenciaEntrega = new OcorrenciaEntrega();
                     ocorrenciaEntrega.setCodigoOcorrencia(line.substring(29, 32).trim());
@@ -161,7 +139,7 @@ public class Orchestrator {
         }
     }
 
-    private void generateSendXml(Ocorren ocorren, String fileName, String carrier) throws Exception {
+    private void generateSendXml(Ocorren ocorren, String fileName) throws Exception {
         for (int i = 0; i < ocorren.getOcorrencias().size(); i++) {
             TxtOcoren txtOcoren = ocorren.getOcorrencias().get(i);
             String xmlTemplate = new String(Files.readAllBytes(
@@ -194,17 +172,17 @@ public class Orchestrator {
             xmlTemplate = xmlTemplate.replace("${attribute17}", "INFORMATIVA");
 
             sendXmlService.sendXmlToOtm(xmlTemplate, fileName, txtOcoren.getOcorrenciasEntregaList().get(i).getIdEmbarque());
-            Files.write(Paths.get(Paths.get(dirXmlOutput, carrier, fileName + "_" + i + ".xml").toAbsolutePath().toString()), xmlTemplate.getBytes());
+            Files.write(Paths.get(Paths.get(dirXmlOutput, txtOcoren.getCnpjTransportadora(), fileName + "_" + i + ".xml").toAbsolutePath().toString()), xmlTemplate.getBytes());
         }
     }
 
-    private String identifyCarrier(String filePath) {
-        if (filePath.contains(TRANSPORTADORA_SOLISTICA)) {
+    private String identifyCarrier(String carrier) {
+        if (carrier.contains("Dev_ftp-int-solistica")) {
             return TRANSPORTADORA_SOLISTICA;
-        } else if (filePath.contains(TRANSPORTADORA_LUFT)) {
+        } else if (carrier.contains("Dev_ftp-int-luft")) {
             return TRANSPORTADORA_LUFT;
         }
-        return filePath;
+        return carrier;
     }
 
 }
