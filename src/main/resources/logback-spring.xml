@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true">
+  <springProperty name="pathLog" source="dir.log" />
+  <springProperty name="projectName" source="pom.project.name" />
+
+  <property name="PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
+
+  <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{yyyy-MM-dd HH:mm:ss} %highlight(%-5level) %highlight(%C{0}:%line) - %msg %nopex%n%highlight(%ex)</pattern>
+    </encoder>
+  </appender>
+
+  <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${pathLog}/${projectName}.log</file>
+
+    <encoder>
+      <pattern>${PATTERN}</pattern>
+    </encoder>
+
+    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+      <fileNamePattern>${pathLog}/historico/${projectName}-%d{yyyy-MM-dd}-%i.log.zip</fileNamePattern>
+      <maxFileSize>300MB</maxFileSize>
+    </rollingPolicy>
+  </appender>
+
+  <appender name="FILE_ERROR" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${pathLog}/${projectName}-ERROR.log</file>
+    <filter class="ch.qos.logback.classic.filter.LevelFilter">
+      <level>ERROR</level>
+      <onMatch>ACCEPT</onMatch>
+      <onMismatch>DENY</onMismatch>
+    </filter>
+
+    <encoder>
+      <pattern>${PATTERN}</pattern>
+    </encoder>
+
+    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+      <fileNamePattern>${pathLog}/historico/${projectName}-ERROR_%d{yyyy-MM-dd}-%i.log.zip</fileNamePattern>
+      <maxFileSize>300MB</maxFileSize>
+    </rollingPolicy>
+  </appender>
+
+  <appender name="FILE_WARNING" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <file>${pathLog}/${projectName}-WARNING.log</file>
+    <filter class="ch.qos.logback.classic.filter.LevelFilter">
+      <level>WARN</level>
+      <onMatch>ACCEPT</onMatch>
+      <onMismatch>DENY</onMismatch>
+    </filter>
+
+    <encoder>
+      <pattern>${PATTERN}</pattern>
+    </encoder>
+
+    <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+      <fileNamePattern>${pathLog}/historico/${projectName}-WARNING%d{yyyy-MM-dd}-%i.log.zip</fileNamePattern>
+      <maxFileSize>300MB</maxFileSize>
+    </rollingPolicy>
+  </appender>
+
+  <logger name="br.com.actionsys" level="INFO" >
+    <appender-ref ref="FILE" />
+  </logger>
+
+  <logger name="com.ulisesbocchio" level="error"/>
+  <logger name="org.springframework" level="error"/>
+
+  <root level="INFO">
+    <appender-ref ref="CONSOLE" />
+    <appender-ref ref="FILE_ERROR" />
+    <appender-ref ref="FILE_WARNING" />
+  </root>
+
+</configuration>
