@@ -1,4 +1,4 @@
-# Conector Ocoren To XML
+# Conector Reckitt Ocorren To XML
 
 Conector Reckitt com finalidade de receber arquivos txt no formato ocoren das transportadoras via SFTP e transformar para layout OTM enviando-o após o processo. 
 
