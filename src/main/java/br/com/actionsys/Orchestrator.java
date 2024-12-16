@@ -76,20 +76,18 @@ public class Orchestrator {
                     Path filePath = Paths.get(dirTxtInput, file);
                     if (filePath.toString().endsWith(".txt")) {
                         try {
-                            // Identifica qual transportadora estamos a processar
-                            String carrier = identifyCarrier(config.getUsername());
-
                             // Transforma txt para objeto Ocorren
                             Ocorren ocorren = readOcorenFile(filePath.toString());
                             // Gera xml OTM e envia para OTM.
                             generateSendXml(ocorren, file);
 
                             // Move para pasta de saída correspondente a transportadora
-                            Path outputPath = Paths.get(dirTxtOutput, carrier, file);
+                            Path outputPath = Paths.get(dirTxtOutput, identifyCarrier(config.getUsername()), file);
                             FilesUtil.move(filePath.toFile(), outputPath.toString());
                             log.info("Arquivo processado e movido para saída: {}", file);
                         } catch (Exception e) {
                             Path errorPath = Paths.get(dirTxtError, file);
+                            FilesUtil.writeErrorLog(file, e, dirTxtError);
                             FilesUtil.move(filePath.toFile(), errorPath.toString());
                             log.error("Erro ao processar arquivo: {}, movido para pasta de erro.", file, e);
                         }
