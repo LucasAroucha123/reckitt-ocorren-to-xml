@@ -49,12 +49,6 @@ public class Orchestrator {
     @Value("${dir.txt.output}")
     private String dirTxtOutput;
 
-    // xml folders
-    @Value("${dir.xml.error}")
-    private String dirXmlError;
-    @Value("${dir.xml.output}")
-    private String dirXmlOutput;
-
     // Transportadoras
     private static final String TRANSPORTADORA_LUFT = "luft";
     private static final String TRANSPORTADORA_SOLISTICA = "solistica";
@@ -74,7 +68,7 @@ public class Orchestrator {
 
                 for (String file : downloadedFiles) {
                     Path filePath = Paths.get(dirTxtInput, file);
-                    if (filePath.toString().endsWith(".txt")) {
+                    if (filePath.toString().toLowerCase().endsWith(".txt")) {
                         try {
                             // Transforma txt para objeto Ocorren
                             Ocorren ocorren = readOcorenFile(filePath.toString());
@@ -107,8 +101,7 @@ public class Orchestrator {
 
     private Ocorren readOcorenFile(String filePath) throws IOException {
         Ocorren ocorren = new Ocorren();
-        TxtOcoren txtOcoren = new TxtOcoren();
-        List<OcorrenciaEntrega> ocorrenciaEntregasList = new ArrayList<>();
+        List<TxtOcoren> txtOcorenList = new ArrayList<>();
 
         try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
             if (br.readLine() == null) {
@@ -116,63 +109,71 @@ public class Orchestrator {
             }
 
             String line;
+            TxtOcoren currentTxtOcoren = null;
+
             while ((line = br.readLine()) != null) {
                 String idRegistry = line.substring(0, 3).trim();
+
                 if (idRegistry.equals("541")) {
-                    txtOcoren.setCnpjTransportadora(line.substring(8, 18));
-                    ocorren.getOcorrencias().add(txtOcoren);
+                    currentTxtOcoren = new TxtOcoren();
+                    currentTxtOcoren.setCnpjTransportadora(line.substring(3, 17));
+                    currentTxtOcoren.setOcorrenciasEntregaList(new ArrayList<>());
+                    txtOcorenList.add(currentTxtOcoren);
                 }
-                if (idRegistry.equals("542")) {
+
+                if (idRegistry.equals("542") && currentTxtOcoren != null) {
                     OcorrenciaEntrega ocorrenciaEntrega = new OcorrenciaEntrega();
                     ocorrenciaEntrega.setCodigoOcorrencia(line.substring(29, 32).trim());
                     ocorrenciaEntrega.setDataOcorrencia(line.substring(32, 40).trim());
                     ocorrenciaEntrega.setHoraOcorrencia(line.substring(40, 44).trim());
                     ocorrenciaEntrega.setIdEmbarque(line.substring(46, 66).trim());
-                    ocorrenciaEntregasList.add(ocorrenciaEntrega);
-                    txtOcoren.setOcorrenciasEntregaList(ocorrenciaEntregasList);
-                    ocorren.getOcorrencias().add(txtOcoren);
+                    currentTxtOcoren.getOcorrenciasEntregaList().add(ocorrenciaEntrega);
                 }
             }
+
+            ocorren.setOcorrencias(txtOcorenList);
             return ocorren;
         }
     }
 
     private void generateSendXml(Ocorren ocorren, String fileName) throws Exception {
-        for (int i = 0; i < ocorren.getOcorrencias().size(); i++) {
-            TxtOcoren txtOcoren = ocorren.getOcorrencias().get(i);
+        for (TxtOcoren txtOcoren : ocorren.getOcorrencias()) {
             String xmlTemplate = new String(Files.readAllBytes(
                     Paths.get(Objects.requireNonNull(getClass().getResource("/TemplateXml/XML_PADRAO_PEDIDO_OBD.xml")).toURI())));
 
-            // Se o código ocorrência for igual a 001, não mandar para OTM.
-            if (txtOcoren.getOcorrenciasEntregaList().get(i).getCodigoOcorrencia().equals("001")) {
-                continue;
+            for (OcorrenciaEntrega entrega : txtOcoren.getOcorrenciasEntregaList()) {
+                if ("001".equals(entrega.getCodigoOcorrencia())) {
+                    continue;
+                }
+
+                xmlTemplate = xmlTemplate.replace("${xidStatusCode}", codeUtil.transformCode(entrega.getCodigoOcorrencia()));
+                xmlTemplate = xmlTemplate.replace("${domainNameStatusCode}", "RBBR");
+                xmlTemplate = xmlTemplate.replace("${xidTimeZoneGid}", "America/Sao_Paulo");
+                xmlTemplate = xmlTemplate.replace("${gLogDateEventDt}", entrega.getDataOcorrencia().substring(4)
+                        + entrega.getDataOcorrencia().substring(2, 4)
+                        + entrega.getDataOcorrencia().substring(0, 2)
+                        + entrega.getHoraOcorrencia() + "00");
+                xmlTemplate = xmlTemplate.replace("${tZIdEventDt}", "America/Sao_Paulo");
+                xmlTemplate = xmlTemplate.replace("${tZOffSetEventDt}", "-03:00");
+                xmlTemplate = xmlTemplate.replace("${ssStop}", "2");
+                xmlTemplate = xmlTemplate.replace("${domainNameStatusGroupGid}", "RBBR");
+                xmlTemplate = xmlTemplate.replace("${xidStatusGroupGid}", "RB_CS_OCORRENCIAS_SG");
+                xmlTemplate = xmlTemplate.replace("${domainNameRResponsiblePartyGid}", "RBBR");
+                xmlTemplate = xmlTemplate.replace("${xidResponsiblePartyGid}", "RB_TRANSPORTADORA");
+                xmlTemplate = xmlTemplate.replace("${gLogDateEventRecdDate}", new SimpleDateFormat("yyyyMMddHHmmss").format(new Date()));
+                xmlTemplate = xmlTemplate.replace("${tZIdEventRecdDate}", "UTC");
+                xmlTemplate = xmlTemplate.replace("${tZOffSetEventRecdDate}", "+00:00");
+                xmlTemplate = xmlTemplate.replace("${domainNameReleaseGid}", "RBBR/RBC");
+                xmlTemplate = xmlTemplate.replace("${xidReleaseGid}", entrega.getIdEmbarque());
+                xmlTemplate = xmlTemplate.replace("${attribute17}", "INFORMATIVA");
+
+                log.info("Request OTM - {}", xmlTemplate);
+                String response = sendXmlService.sendXmlToOtm(xmlTemplate, fileName, entrega.getIdEmbarque());
+                log.info("Response OTM - {}", response);
             }
-            xmlTemplate = xmlTemplate.replace("${xidStatusCode}", codeUtil.transformCode(txtOcoren.getOcorrenciasEntregaList().get(i).getCodigoOcorrencia()));
-
-            xmlTemplate = xmlTemplate.replace("${domainNameStatusCode}", "RBBR");
-            xmlTemplate = xmlTemplate.replace("${xidTimeZoneGid}", "America/Sao_Paulo");
-            xmlTemplate = xmlTemplate.replace("${gLogDateEventDt}", txtOcoren.getOcorrenciasEntregaList().get(i).getDataOcorrencia().substring(4)
-                    + txtOcoren.getOcorrenciasEntregaList().get(i).getDataOcorrencia().substring(2, 4)
-                    + txtOcoren.getOcorrenciasEntregaList().get(i).getDataOcorrencia().substring(0, 2)
-                    + txtOcoren.getOcorrenciasEntregaList().get(i).getHoraOcorrencia() + "00");
-            xmlTemplate = xmlTemplate.replace("${tZIdEventDt}", "America/Sao_Paulo");
-            xmlTemplate = xmlTemplate.replace("${tZOffSetEventDt}", "-03:00");
-            xmlTemplate = xmlTemplate.replace("${ssStop}", "2");
-            xmlTemplate = xmlTemplate.replace("${domainNameStatusGroupGid}", "RBBR");
-            xmlTemplate = xmlTemplate.replace("${xidStatusGroupGid}", "RB_CS_OCORRENCIAS_SG");
-            xmlTemplate = xmlTemplate.replace("${domainNameRResponsiblePartyGid}", "RBBR");
-            xmlTemplate = xmlTemplate.replace("${xidResponsiblePartyGid}", "RB_TRANSPORTADORA");
-            xmlTemplate = xmlTemplate.replace("${gLogDateEventRecdDate}", new SimpleDateFormat("yyyyMMddHHmmss").format(new Date()));
-            xmlTemplate = xmlTemplate.replace("${tZIdEventRecdDate}", "UTC");
-            xmlTemplate = xmlTemplate.replace("${tZOffSetEventRecdDate}", "+00:00");
-            xmlTemplate = xmlTemplate.replace("${domainNameReleaseGid}", "RBBR/RBC");
-            xmlTemplate = xmlTemplate.replace("${xidReleaseGid}", txtOcoren.getOcorrenciasEntregaList().get(i).getIdEmbarque());
-            xmlTemplate = xmlTemplate.replace("${attribute17}", "INFORMATIVA");
-
-            sendXmlService.sendXmlToOtm(xmlTemplate, fileName, txtOcoren.getOcorrenciasEntregaList().get(i).getIdEmbarque());
-            Files.write(Paths.get(Paths.get(dirXmlOutput, txtOcoren.getCnpjTransportadora(), fileName + "_" + i + ".xml").toAbsolutePath().toString()), xmlTemplate.getBytes());
         }
     }
+
 
     private String identifyCarrier(String carrier) {
         if (carrier.contains("Dev_ftp-int-solistica")) {

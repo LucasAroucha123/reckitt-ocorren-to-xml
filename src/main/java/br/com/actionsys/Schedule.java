@@ -11,12 +11,12 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class Schedule {
 
-  @Autowired
-  private Orchestrator orchestrator;
+    @Autowired
+    private Orchestrator orchestrator;
 
-  @Scheduled(fixedDelayString = "${schedule.delay-seconds}", timeUnit = TimeUnit.SECONDS)
-  public void run() {
-    orchestrator.process();
-  }
+    @Scheduled(fixedDelayString = "${schedule.delay-seconds}", timeUnit = TimeUnit.SECONDS)
+    public void run() {
+        orchestrator.process();
+    }
 
 }

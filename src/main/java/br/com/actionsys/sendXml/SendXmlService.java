@@ -12,11 +12,11 @@ public class SendXmlService {
     @Autowired
     OtmSendXmlClient otmSendXmlClient;
 
-    public void sendXmlToOtm(String xml, String fileName, String id) {
-
+    public String sendXmlToOtm(String xml, String fileName, String id) {
         try {
             String response = otmSendXmlClient.sendXml(xml);
             log.info("Response para o arquivo {}, id: {} : {}", fileName, id, response);
+            return response;
         } catch (FeignException e) {
             log.error("Erro ao enviar XML para o OTM. Arquivo: {}. Erro: {}", fileName, e.getMessage());
             throw new RuntimeException("Erro ao enviar XML para OTM: " + fileName, e);

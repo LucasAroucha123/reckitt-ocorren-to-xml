@@ -72,6 +72,7 @@ public class SftpService {
             SFTPClient sftpClient = sshClient.newSFTPClient();
 
             sftpClient.rm(remoteFilePath);
+            log.info("Arquivo deletado com sucesso: " + remoteFilePath);
 
             sftpClient.close();
         } catch (Exception e) {
