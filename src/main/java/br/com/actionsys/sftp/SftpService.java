@@ -41,7 +41,6 @@ public class SftpService {
                 sftpClient.get(remoteFilePath, localFilePath);
                 log.info("Arquivo baixado: {}", arquivo.getName());
                 arquivosBaixados.add(arquivo.getName());
-                deleteFile(remoteFilePath, config);
             }
 
             sftpClient.close();
@@ -72,7 +71,7 @@ public class SftpService {
             SFTPClient sftpClient = sshClient.newSFTPClient();
 
             sftpClient.rm(remoteFilePath);
-            log.info("Arquivo deletado com sucesso: " + remoteFilePath);
+            log.info("Arquivo deletado com sucesso do SFTP: " + remoteFilePath);
 
             sftpClient.close();
         } catch (Exception e) {

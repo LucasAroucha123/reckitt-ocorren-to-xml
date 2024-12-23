@@ -79,6 +79,7 @@ public class Orchestrator {
                             Path outputPath = Paths.get(dirTxtOutput, identifyCarrier(config.getUsername()), file);
                             FilesUtil.move(filePath.toFile(), outputPath.toString());
                             log.info("Arquivo processado e movido para saída: {}", file);
+                            sftpService.deleteFile(config.getInputFolder() + "/" + file, config);
                         } catch (Exception e) {
                             Path errorPath = Paths.get(dirTxtError, file);
                             FilesUtil.writeErrorLog(file, e, dirTxtError);
@@ -112,22 +113,24 @@ public class Orchestrator {
             TxtOcoren currentTxtOcoren = null;
 
             while ((line = br.readLine()) != null) {
-                String idRegistry = line.substring(0, 3).trim();
+                if(!line.isEmpty()) {
+                    String idRegistry = line.substring(0, 3).trim();
 
-                if (idRegistry.equals("541")) {
-                    currentTxtOcoren = new TxtOcoren();
-                    currentTxtOcoren.setCnpjTransportadora(line.substring(3, 17));
-                    currentTxtOcoren.setOcorrenciasEntregaList(new ArrayList<>());
-                    txtOcorenList.add(currentTxtOcoren);
-                }
+                    if (idRegistry.equals("541")) {
+                        currentTxtOcoren = new TxtOcoren();
+                        currentTxtOcoren.setCnpjTransportadora(line.substring(3, 17));
+                        currentTxtOcoren.setOcorrenciasEntregaList(new ArrayList<>());
+                        txtOcorenList.add(currentTxtOcoren);
+                    }
 
-                if (idRegistry.equals("542") && currentTxtOcoren != null) {
-                    OcorrenciaEntrega ocorrenciaEntrega = new OcorrenciaEntrega();
-                    ocorrenciaEntrega.setCodigoOcorrencia(line.substring(29, 32).trim());
-                    ocorrenciaEntrega.setDataOcorrencia(line.substring(32, 40).trim());
-                    ocorrenciaEntrega.setHoraOcorrencia(line.substring(40, 44).trim());
-                    ocorrenciaEntrega.setIdEmbarque(line.substring(46, 66).trim());
-                    currentTxtOcoren.getOcorrenciasEntregaList().add(ocorrenciaEntrega);
+                    if (idRegistry.equals("542") && currentTxtOcoren != null) {
+                        OcorrenciaEntrega ocorrenciaEntrega = new OcorrenciaEntrega();
+                        ocorrenciaEntrega.setCodigoOcorrencia(line.substring(29, 32).trim());
+                        ocorrenciaEntrega.setDataOcorrencia(line.substring(32, 40).trim());
+                        ocorrenciaEntrega.setHoraOcorrencia(line.substring(40, 44).trim());
+                        ocorrenciaEntrega.setIdEmbarque(line.substring(46, 66).trim());
+                        currentTxtOcoren.getOcorrenciasEntregaList().add(ocorrenciaEntrega);
+                    }
                 }
             }
 
@@ -168,8 +171,7 @@ public class Orchestrator {
                 xmlTemplate = xmlTemplate.replace("${attribute17}", "INFORMATIVA");
 
                 log.info("Request OTM - {}", xmlTemplate);
-                String response = sendXmlService.sendXmlToOtm(xmlTemplate, fileName, entrega.getIdEmbarque());
-                log.info("Response OTM - {}", response);
+                sendXmlService.sendXmlToOtm(xmlTemplate, fileName, entrega.getIdEmbarque());
             }
         }
     }

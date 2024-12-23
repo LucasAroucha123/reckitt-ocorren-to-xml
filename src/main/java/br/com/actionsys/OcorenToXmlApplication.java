@@ -42,12 +42,13 @@ public class OcorenToXmlApplication implements ApplicationRunner {
         log.info("dir.txt.error : {}", env.getProperty("dir.txt.error"));
         log.info("dir.txt.others : {}", env.getProperty("dir.txt.others"));
 
-        log.info("-------------Configurações de pastas XML-------------");
-        log.info("dir.xml.output : {}", env.getProperty("dir.xml.output"));
-        log.info("dir.xml.error : {}", env.getProperty("dir.xml.error"));
-
         log.info("-------------Configurações de pastas FTP-------------");
-        log.info("ftp.input : {}", env.getProperty("ftp.input"));
+        log.info("sftp.solistica.folder : {}", env.getProperty("sftp.solistica.folder"));
+        log.info("sftp.luft.folder : {}", env.getProperty("sftp.luft.folder"));
+        log.info("-------------------------------------------------------------");
+
+        log.info("-------------Configurações de OTM-------------");
+        log.info("otm.send-xml.url : {}", env.getProperty("otm.send-xml.url"));
         log.info("-------------------------------------------------------------");
     }
 }
